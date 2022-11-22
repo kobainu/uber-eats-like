@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { restaurantsIndex } from '../urls/index'
+import { restaurantsIndex } from '../urls/index';
 
 // レストラン一覧のAPIを呼ぶ関数
 export const fetchRestaurants =() => {
