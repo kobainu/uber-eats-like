@@ -3,6 +3,20 @@ module Api
     class LineFoodsController < ApplicationController
       before_action :set_food, only: %i[create] # :onlyオプションをつけることで、特定のアクションの実行前にだけ追加するということができます。
 
+      def index
+        line_foods = LineFood.active
+        if line_foods.exists? # line_foodsが空かどうか？をチェックしています(本教材で作成するアプリケーションでは仮注文ページにはいつでもアクセスすることができます。つまり、仮注文をする前でもこのリクエスト自体は走る可能性があります。その場合を考慮して、line_foods.exists?というチェックをおこなっています。)
+          render json: { # activeなLineFoodがある場合には正常パターンとしてこのようなJSON形式のデータを返します。
+            line_food_ids: line_foods.map { |line_food| line_food.id }, # line_foodsというインスタンスそれぞれをline_foodという単数形の変数名でとって、line_food.idとして１つずつのidを取得しています。それが最終的にline_food_ids: ...のプロパティとなります。
+            restaurant: line_foods[0].restaurant, # １つの仮注文につき１つの店舗という仕様のため、line_foodsの中にある先頭のline_foodインスタンスの店舗の情報を詰めています。
+            count: line_foods.sum { |line_food| line_food[:count] }, # 各line_foodインスタンスには数量を表す:countがあります。
+            amount: line_foods.sum { |line_food| line_food.total_amount }, # 各line_foodがインスタンスメソッドtotal_amountを呼んで、またその数値を合算しています。
+          }, status: :ok
+        else # activeなLineFoodが一つも存在しないケース
+          render json: {}, status: :no_content # 空データがJSON形式で返されます。ステータスコードは「リクエストは成功したが、空データ」として204を返す
+        end
+      end
+
       def create
         if LineFood.active.other_restaurant(@ordered_food.restaurant.id).exists?. # 例外パターンで早期リターン(「他店舗でアクティブなLineFood」をActiveRecord_Relationのかたちで取得します。そして、それが存在するかどうか？をexists?で判断しています。ここでtrueにある場合には、JSON形式のデータを返却してreturnして処理を終えます。)
           return render json: {
