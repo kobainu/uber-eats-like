@@ -1,7 +1,7 @@
 module Api
   module V1
     class LineFoodsController < ApplicationController
-      before_action :set_food, only: %i[create] # :onlyオプションをつけることで、特定のアクションの実行前にだけ追加するということができます。
+      before_action :set_food, only: %i[create replace] # :onlyオプションをつけることで、特定のアクションの実行前にだけ追加するということができます。
 
       def index
         line_foods = LineFood.active
@@ -28,6 +28,22 @@ module Api
         set_line_food(@ordered_food) # 例外パターンに当てはまらず、正常に仮注文を作成する場合にはset_line_food(@ordered_food)でline_foodインスタンスを生成していきます。(*1)
 
         if @line_food.save # @line_foodをsaveで保存します。この時にエラーが発生した場合にはif @line_food.saveでfalseと判断されrender json: {}, status: :internal_server_errorが返ります。もしフロントエンドでエラーの内容に応じて表示を変えるような場合にここでHTTPレスポンスステータスコードが500系になることをチェックできます。
+          render json: {
+            line_food: @line_food
+          }, status: :created
+        else
+          render json: {}, status: :internal_server_error
+        end
+      end
+
+      def replace
+        LineFood.active.other_restaurant(@ordered_food.restaurant.id).each do |line_food| # 他店舗のactiveなLineFood一覧を取得し
+          line_food.update_attribute(:active, false) # それぞれのline_food.activeをfalseに更新する
+        end
+
+        set_line_food(@ordered_food)
+
+        if @line_food.save # createアクションと同様
           render json: {
             line_food: @line_food
           }, status: :created
