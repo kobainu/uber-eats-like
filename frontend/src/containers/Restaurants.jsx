@@ -36,7 +36,6 @@ export const Restaurants = () => {
 
   return (
     <Fragment>
-      <h1>test</h1>
       <HeaderWrapper>
         <MainLogoImage src={MainLogo} alt="main logo" />
       </HeaderWrapper>
