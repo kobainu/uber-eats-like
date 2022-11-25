@@ -1,23 +1,32 @@
 import React, { Fragment, useEffect, useReducer, useState } from 'react';
 import styled from 'styled-components';
-import { Link } from "react-router-dom";
+import { Link, useHistory } from "react-router-dom";
+
 // components
 import { LocalMallIcon } from '../components/Icons';
 import { FoodWrapper } from '../components/FoodWrapper';
+import { NewOrderConfirmDialog } from '../components/NewOrderConfirmDialog';
 import Skeleton from '@material-ui/lab/Skeleton';
-import { FoodOrderDialog } from '../components/FoodOrderDialog';
+
+
 // reducers
 import {
   initialState as foodsInitialState, // import { A as B } from '...'とすることで、Aと定義されているmoduleをこのファイルではBとしてimportすることができます。今回の例でいえば、本来はinitialStateという名前のmoduleをfoodsInitialStateという名前にしてimportしています。(何故わざわざこんなことをするのか？というと、後ほどinitialStateという名前のオブジェクトが登場するからです。このように同一ファイルで同じ名前のmoduleやグローバル変数を扱うこことはできません。どちらか一方を別の名前にするために、このようにimport { A as B } from '...'としています)
   foodsActionTypes,
   foodsReducer,
 } from '../reducers/foods';
+
 // apis
 import { fetchFoods } from '../apis/foods';
+import { postLineFoods, replaceLineFoods } from '../apis/line_foods';
+
 // images
 import MainLogo from '../images/logo.png';
+import { FoodOrderDialog } from '../components/FoodOrderDialog';
 import FoodImage from '../images/food-image.jpg';
+
 // constants
+import { HTTP_STATUS_CODE } from '../constants';
 import { COLORS } from '../style_constants';
 import { REQUEST_STATE } from '../constants';
 
@@ -50,20 +59,18 @@ const ItemWrapper = styled.div`
   margin: 16px;
 `;
 
-const submitOrder = () => {
-  // 後ほど仮注文のAPIを実装します
-  console.log('登録ボタンが押された！')
-}
-
 export const Foods = ({
   match
 }) => {
   const [foodsState, dispatch] = useReducer(foodsReducer, foodsInitialState);
-
+  const history = useHistory();
   const initialState = { // stateの初期値
     isOpenOrderDialog: false, // モーダルは閉じている
     selectedFood: null, // まだフード情報を未選択
     selectedFoodCount: 1, // selectedFoodがいくつ選ばれているか？という数量を表す値です
+    isOpenNewOrderDialog: false, // NewOrderConfirmDialogコンポーネントをレンダリングする/しないのフラグです
+    existingRestaurantName: '', // existingRestaurantNameとnewRestaurantNameはそれぞれNewOrderConfirmDialogコンポーネントにprops経由で渡したい元々仮注文に入っていた店舗名と、新しく入った店舗名です
+    newRestaurantName: '', // それぞれ文字列データなので、初期値は空文字''を入れておきます
   }
 
   const [state, setState] = useState(initialState);
@@ -80,6 +87,34 @@ export const Foods = ({
         });
       })
   }, [match.params.restaurantsId]);
+
+  const submitOrder = () => { // postLineFoods()を実行した結果...
+    postLineFoods({
+      foodId: state.selectedFood.id,
+      count: state.selectedFoodCount,
+    })
+    .then(() => history.push('/orders')) // 成功した場合...history.push('/orders')を使ってそのまま注文ページへと遷移させます
+    .catch((e) => { // 失敗した場合...
+      if (e.response.status === HTTP_STATUS_CODE.NOT_ACCEPTABLE) { // e.response.statusを参照し、HTTP_STATUS_CODE.NOT_ACCEPTABLE(406)かどうか？をチェック...
+        setState({ // trueであれば、NewOrderConfirmDialogコンポーネントを表示
+          ...state,
+          isOpenOrderDialog: false, // FoodOrderDialogを閉じて
+          isOpenNewOrderDialog: true, // NewOrderConfirmDialogを開き
+          existingRestaurantName: e.response.data.existing_restaurant, // 必要な情報をeオブジェクトから取得してstateにセットしています
+          newRestaurantName: e.response.data.new_restaurant,
+        })
+      } else {
+        throw e;
+      }
+    })
+  }
+
+  const replaceOrder = () => {
+    replaceLineFoods({
+      foodId: state.selectedFood.id,
+      count: state.selectedFoodCount,
+    }).then(() => history.push('/orders'))
+  };
 
   return (
     <Fragment>
@@ -146,6 +181,16 @@ export const Foods = ({
             selectedFood: null,
             selectedFoodCount: 1,
           })}
+        />
+      }
+      {
+        state.isOpenNewOrderDialog && // state.isOpenNewOrderDialogがtrueの場合に、NewOrderConfirmDialogコンポーネントをレンダリングします
+        <NewOrderConfirmDialog
+          isOpen={state.isOpenNewOrderDialog} // state.isOpenNewOrderDialogがfalseの場合(モーダルを表示しなくていいとき)にNewOrderConfirmDialogをわざわざ処理させたくないので、このようにしています(コンポーネントをレンダリングしなくても、Reactはコンポーネント内部の処理を走らせるため)
+          onClose={() => setState({ ...state, isOpenNewOrderDialog: false })}
+          existingRestaurantName={state.existingRestaurantName}
+          newRestaurantName={state.newRestaurantName}
+          onClickSubmit={() => replaceOrder()}
         />
       }
     </Fragment>
