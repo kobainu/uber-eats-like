@@ -1,10 +1,11 @@
-import React, { Fragment, useEffect, useReducer } from 'react';
+import React, { Fragment, useEffect, useReducer, useState } from 'react';
 import styled from 'styled-components';
 import { Link } from "react-router-dom";
 // components
 import { LocalMallIcon } from '../components/Icons';
 import { FoodWrapper } from '../components/FoodWrapper';
 import Skeleton from '@material-ui/lab/Skeleton';
+import { FoodOrderDialog } from '../components/FoodOrderDialog';
 // reducers
 import {
   initialState as foodsInitialState, // import { A as B } from '...'とすることで、Aと定義されているmoduleをこのファイルではBとしてimportすることができます。今回の例でいえば、本来はinitialStateという名前のmoduleをfoodsInitialStateという名前にしてimportしています。(何故わざわざこんなことをするのか？というと、後ほどinitialStateという名前のオブジェクトが登場するからです。このように同一ファイルで同じ名前のmoduleやグローバル変数を扱うこことはできません。どちらか一方を別の名前にするために、このようにimport { A as B } from '...'としています)
@@ -53,6 +54,14 @@ export const Foods = ({
   match
 }) => {
   const [foodsState, dispatch] = useReducer(foodsReducer, foodsInitialState);
+
+  const initialState = { // stateの初期値
+    isOpenOrderDialog: false, // モーダルは閉じている
+    selectedFood: null, // まだフード情報を未選択
+    selectedFoodCount: 1, // selectedFoodがいくつ選ばれているか？という数量を表す値です
+  }
+
+  const [state, setState] = useState(initialState);
   
   useEffect(() => {
     dispatch({ type: foodsActionTypes.FETCHING });
@@ -96,13 +105,30 @@ export const Foods = ({
               <ItemWrapper key={food.id}>
                 <FoodWrapper
                   food={food}
-                  onClickFoodWrapper={(food) => console.log(food)} // クリックされたfoodがコンソールに表示される
+                  onClickFoodWrapper={ // フード情報クリック時...
+                    (food) => setState({
+                    ...state,
+                    isOpenOrderDialog: true, // モーダルを開く
+                    selectedFood: food, // selectedFoodに選択中のフード情報を入れる
+                    })
+                  } // クリックされたfoodがコンソールに表示される
                   imageUrl={FoodImage}
                 />
               </ItemWrapper>
             )
         }
       </FoodsList>
+      {
+        state.isOpenOrderDialog && // state.isOpenOrderDialogがtrueの場合にFoodOrderDialogコンポーネントをレンダリング
+          <FoodOrderDialog
+            food={state.selectedFood}
+            isOpen={state.isOpenOrderDialog}
+            onClose={() => setState({ // モーダル外をクリックでモーダルを閉じる
+              ...state,
+              isOpenOrderDialog: false,
+            })}
+          />
+      }
     </Fragment>
   )
 }
